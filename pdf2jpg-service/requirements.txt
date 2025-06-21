@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pymupdf4llm
+pillow
+python-multipart
+psycopg2-binary
+sqlalchemy
+requests
+
