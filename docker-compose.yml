@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   db:
     image: postgres:13-alpine
@@ -16,6 +14,29 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "8003:8000"
+    environment:
+      - AZURE_OPENAI_API_VERSION=2024-12-01-preview
+      - AZURE_OPENAI_ENDPOINT=https://openai-demo-0.openai.azure.com/
+      - AZURE_OPENAI_MODEL_NAME=o4-mini
+      - AZURE_OPENAI_DEPLOYMENT=o4-mini
+      - AZURE_OPENAI_API_KEY=GF0JNfgjKI9EjJNKeSx8RWq5Jk64L84p07mXEls2QPHgVG3DzTbEJQQJ99BEACfhMk5XJ3w3AAABACOGxCYp
+      - ENV=development
+      - DB_SERVER=db
+      - DB_USER=xcardia
+      - DB_PORT=5432
+      - DB_DATABASE=xcardia
+      - DB_USERNAME=xcardia
+      - DB_PASSWORD=xcardia
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - backend
 
