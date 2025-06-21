@@ -30,6 +30,8 @@ class OpenAIRepository:
     def __get_new_client(self):
         return openai.AzureOpenAI(
                 api_key=self._openAI_api_key,
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
             )
     
     def __load_azure_demo_chat(self) -> List:
@@ -54,7 +56,7 @@ class OpenAIRepository:
         response = client.chat.completions.create(
             messages=messages,
             max_completion_tokens=250,
-            model="gpt-3.5-turbo",
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-3.5-turbo"),
         )
         return response.choices[0].message.content.strip()
     
@@ -132,7 +134,7 @@ class OpenAIRepository:
         response = client.chat.completions.create(
             messages=chat.to_llm_chat(),
             max_completion_tokens=5000,
-            model="gpt-3.5-turbo",
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-3.5-turbo"),
         )
         return MessageToSend(
             role=response.choices[0].message.role,
@@ -215,7 +217,7 @@ class OpenAIRepository:
             response = client.chat.completions.create(
                 messages=messages,
                 max_completion_tokens=1000,
-                model="gpt-3.5-turbo",
+                model=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-3.5-turbo"),
             )
             
             return {

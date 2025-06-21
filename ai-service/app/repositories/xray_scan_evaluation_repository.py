@@ -21,45 +21,27 @@ class XRayScanEvaluationRepository:
     def _get_model(self):
         if self._model is None:
             try:
-                # Önce gerçek model.pth dosyasını yüklemeyi dene
                 model_path = "/app/models/model.pth"
                 if os.path.exists(model_path):
                     print("Loading custom model from model.pth...")
-                    
-                    # Torchxrayvision'un DenseNet'ini kullan ama classifier'ı değiştir
-                    
-                    # Base model'i yükle
-                    base_model = xrv.models.DenseNet(weights="densenet121-res224-all")
-                    
-                    # Model'in classifier'ını 3 sınıf için yeniden yapılandır
-                    num_classes = 3  # model.pth'deki sınıf sayısı
-                    base_model.classifier = nn.Linear(1024, num_classes)
-                    
-                    # Custom weights yükle
+
+                    # Eğitimde kullanılan orijinal sınıf sayısı 15'ti
+                    base_model = xrv.models.DenseNet(num_classes=15)
+                    num_ftrs = base_model.classifier.in_features
+                    base_model.classifier = nn.Linear(num_ftrs, 3)  # 3 hedef sınıf
+
                     checkpoint = torch.load(model_path, map_location='cpu')
-                    
-                    # Sadece classifier weights'ini yükle, diğerlerini atla
-                    model_dict = base_model.state_dict()
-                    pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict and 'classifier' in k}
-                    model_dict.update(pretrained_dict)
-                    base_model.load_state_dict(model_dict)
-                    
-                    # Model'i eval moduna al
+                    base_model.load_state_dict(checkpoint)
                     base_model.eval()
-                    
-                    print("Custom model loaded successfully from model.pth")
-                    print("Model trained for: Cardiomegaly, Hernia, Infiltration")
-                    
+
                     self._model = base_model
+                    print("Custom model loaded successfully from model.pth")
                 else:
-                    print("model.pth not found, using base model...")
+                    print("model.pth not found, using pretrained base model...")
                     self._model = xrv.models.DenseNet(weights="densenet121-res224-all")
-                    print("Base model loaded successfully")
             except Exception as e:
-                print(f"Error loading real model: {e}")
-                # Fallback to dummy model
+                print(f"Error loading model.pth: {e}")
                 self._model = self._create_dummy_model()
-                print("Using dummy model for X-ray evaluation")
         return self._model
 
     def _create_dummy_model(self):
@@ -132,7 +114,7 @@ class XRayScanEvaluationRepository:
             preds_dict = dict(zip(pathologies, preds_numpy))
             
             # Convert NumPy objects to native Python types for serialization
-            preds_dict = {key: float(value) if isinstance(value, np.float32) else value for key, value in preds_dict.items()}
+            preds_dict = {key: float(value) for key, value in preds_dict.items()}
             
             print(f"X-ray evaluation results: {preds_dict}")
             return preds_dict
