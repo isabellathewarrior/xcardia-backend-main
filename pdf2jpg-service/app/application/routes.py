@@ -31,7 +31,7 @@ async def convert_pdf(
 
     # Dosya adını ve yolu oluştur
     filename = f"{uuid.uuid4()}_{file.filename}"
-    file_path = f"./temp/{filename}"
+    file_path = f"/app/temp/{filename}"
 
     # PDF dosyasını diske kaydet
     with open(file_path, "wb") as buffer:
@@ -58,7 +58,7 @@ async def convert_pdf(
             "images": [
                 f"http://localhost:8001/download/{os.path.basename(p)}"
                 for p in image_paths
-]
+            ]
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -72,7 +72,7 @@ def get_logs(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    user_id = str(current_user["user_id"])  # 🔥 Burada string'e dönüştür
+    user_id = str(current_user["user_id"])
 
     logs = (
         db.query(ConversionLog)
@@ -82,14 +82,26 @@ def get_logs(
     )
     return logs
 
-
-
-
 @router.get("/download/{filename}", tags=["PDF"])
-def download_image(filename: str):
-    file_path = os.path.join("temp", filename)
+async def download_image(filename: str):
+    # Docker container içinde doğru yol
+    file_path = os.path.join("/app/temp", filename)
 
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail=f"File {filename} not found")
 
-    return FileResponse(path=file_path, filename=filename, media_type='image/jpeg')
+    # Dosya boyutunu kontrol et
+    file_size = os.path.getsize(file_path)
+    if file_size == 0:
+        raise HTTPException(status_code=500, detail="File is empty")
+
+    return FileResponse(
+        path=file_path, 
+        filename=filename, 
+        media_type='image/jpeg',
+        headers={
+            "Cache-Control": "no-cache",
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(file_size)
+        }
+    )
