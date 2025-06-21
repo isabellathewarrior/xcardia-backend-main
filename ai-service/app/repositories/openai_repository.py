@@ -1,41 +1,38 @@
-from datetime import datetime, timezone
-from dotenv import load_dotenv
-from openai import AzureOpenAI
 import os
 import json
-from typing import Union
+import requests
+from typing import Union, List
+import openai
+from datetime import datetime, timezone
 
 from app.schemes.message_schemes import MessageToSend, ChatToSend, RoleEnum
 
 # Load environment variables from .env file
-load_dotenv('.env.prod')
+from dotenv import load_dotenv
+load_dotenv()
 
 class OpenAIRepository:
     _instance = None
-    _openAI_api_version: Union[str, None] = None
-    _openAI_endpoint: Union[str, None] = None
-    _openAI_model_name: Union[str, None] = None
+    _openAI_client: Union[openai.AzureOpenAI, None] = None
     _openAI_deployment: Union[str, None] = None
     _openAI_api_key: Union[str, None] = None
+    _openAI_organization: Union[str, None] = None
+    _openAI_api_version: Union[str, None] = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(OpenAIRepository, cls).__new__(cls)
-            cls._instance._openAI_api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-            cls._instance._openAI_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-            cls._instance._openAI_model_name = os.getenv("AZURE_OPENAI_MODEL_NAME")
             cls._instance._openAI_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
             cls._instance._openAI_api_key = os.getenv("AZURE_OPENAI_API_KEY")
+            cls._instance._openAI_organization = os.getenv("AZURE_OPENAI_ORGANIZATION")
         return cls._instance
 
     def __get_new_client(self):
-        return AzureOpenAI(
-                api_version=self._openAI_api_version,
-                azure_endpoint=self._openAI_endpoint,
+        return openai.AzureOpenAI(
                 api_key=self._openAI_api_key,
             )
     
-    def __load_azure_demo_chat(self) -> list:
+    def __load_azure_demo_chat(self) -> List:
         """
         Load the Azure OpenAI demo chat messages from a JSON file.
         - **Returns**: A list of messages for the chat completion.
@@ -57,11 +54,11 @@ class OpenAIRepository:
         response = client.chat.completions.create(
             messages=messages,
             max_completion_tokens=250,
-            model=self._openAI_model_name,
+            model="gpt-3.5-turbo",
         )
         return response.choices[0].message.content.strip()
     
-    def __load_initial_chat_with_assistant(self, file_name: str) -> list:
+    def __load_initial_chat_with_assistant(self, file_name: str) -> List:
         """
         Load the initial chat with the base assistant from a JSON file.
         - **Returns**: A ChatLoaded object with the initial chat data.
@@ -73,7 +70,7 @@ class OpenAIRepository:
             chat_data = json.load(file)
         return chat_data
  
-    def __load_initial_chat_with_base_assistant(self) -> list:
+    def __load_initial_chat_with_base_assistant(self) -> List:
         """
         Load the initial chat with the base assistant from a JSON file.
         - **Returns**: A ChatLoaded object with the initial chat data.
@@ -83,9 +80,9 @@ class OpenAIRepository:
     
     def __expand_initial_messages_with_user(
             self, 
-            initial_chat_messages: list,
+            initial_chat_messages: List,
             first_message_from_user: MessageToSend,
-        ) -> list:
+        ) -> List:
         for message in initial_chat_messages:
             message["user_id"] = first_message_from_user.user_id
             message["chat_id"] = first_message_from_user.chat_id
@@ -94,7 +91,7 @@ class OpenAIRepository:
     def __get_initial_chat_with_base_assistant(
             self, 
             first_message_from_user: MessageToSend,
-        ) -> list:
+        ) -> List:
         initial_chat_messages = self.__load_initial_chat_with_base_assistant()
         initial_chat_messages = self.__expand_initial_messages_with_user(
             initial_chat_messages,
@@ -114,9 +111,10 @@ class OpenAIRepository:
         initial_chat_messages = self.__get_initial_chat_with_base_assistant(
             first_message_from_user,
         )
-        new_chat = ChatToSend.from_first_user_message(
-            first_message_from_user=first_message_from_user,
-            messages=initial_chat_messages,
+        new_chat = ChatToSend(
+            id=first_message_from_user.chat_id,
+            user_id=first_message_from_user.user_id,
+            messages=[MessageToSend(**msg) for msg in initial_chat_messages],
         )
         new_chat.append(first_message_from_user)
         return new_chat
@@ -132,9 +130,9 @@ class OpenAIRepository:
         """
         client = self.__get_new_client()
         response = client.chat.completions.create(
-            messages=chat.to_llm_messages(),
+            messages=chat.to_llm_chat(),
             max_completion_tokens=5000,
-            model=self._openAI_model_name,
+            model="gpt-3.5-turbo",
         )
         return MessageToSend(
             role=response.choices[0].message.role,
@@ -143,7 +141,7 @@ class OpenAIRepository:
             user_id=chat.user_id,
         )
     
-    def __load_initial_chat_with_xray_assistant(self) -> list:
+    def __load_initial_chat_with_xray_assistant(self) -> List:
         """
         Load the initial chat with the base assistant from a JSON file.
         - **Returns**: A ChatLoaded object with the initial chat data.
@@ -155,7 +153,7 @@ class OpenAIRepository:
             self, 
             xray_scan_evaluation: dict,
             first_message_from_user: MessageToSend,
-        ) -> list:
+        ) -> List:
         initial_chat_messages = self.__load_initial_chat_with_xray_assistant()
         content = initial_chat_messages[0]["content"] 
         content = content + "\n" + json.dumps(xray_scan_evaluation, indent=4)
@@ -181,9 +179,10 @@ class OpenAIRepository:
             xray_scan_evaluation,
             first_message_from_user,
         )
-        xray_assistant_chat = ChatToSend.from_first_user_message(
-            first_message_from_user=first_message_from_user,
-            messages=initial_chat_messages,
+        xray_assistant_chat = ChatToSend(
+            id=first_message_from_user.chat_id,
+            user_id=first_message_from_user.user_id,
+            messages=[MessageToSend(**msg) for msg in initial_chat_messages],
         )
         complete_chat = ChatToSend(
             id=previous_chat.id,
@@ -193,4 +192,41 @@ class OpenAIRepository:
         xray_assistant_chat.append(first_message_from_user)
         interpretation = self.get_chat_completion(chat=complete_chat)
         xray_assistant_chat.append(interpretation)
-        return xray_assistant_chat 
+        return xray_assistant_chat
+
+    def send_message_to_chat(self, chat_data: dict) -> dict:
+        """
+        Send a message to chat with encrypted user ID.
+        - **chat_data**: Dictionary containing pseudo_user_id and messages.
+        - **Returns**: A dictionary with LLM response.
+        """
+        try:
+            client = self.__get_new_client()
+            
+            # Convert messages to OpenAI format
+            messages = []
+            for msg in chat_data.get("messages", []):
+                messages.append({
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", "")
+                })
+            
+            # Get LLM response
+            response = client.chat.completions.create(
+                messages=messages,
+                max_completion_tokens=1000,
+                model="gpt-3.5-turbo",
+            )
+            
+            return {
+                "response": response.choices[0].message.content.strip(),
+                "pseudo_user_id": chat_data.get("pseudo_user_id"),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+        except Exception as e:
+            return {
+                "error": str(e),
+                "pseudo_user_id": chat_data.get("pseudo_user_id"),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            } 

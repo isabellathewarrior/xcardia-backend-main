@@ -4,7 +4,6 @@ import io
 import skimage.io
 from app.repositories.xray_scan_evaluation_repository import XRayScanEvaluationRepository
 
-
 xray_scan_evaluation_router = APIRouter(
     prefix="/xray_scan_evaluation",
     tags=["xray_scan_evaluation"],

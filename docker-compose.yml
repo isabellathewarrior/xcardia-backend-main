@@ -34,9 +34,12 @@ services:
       - DB_DATABASE=xcardia
       - DB_USERNAME=xcardia
       - DB_PASSWORD=xcardia
+      - JWT_SECRET_KEY=your-secret-key-here-change-in-production
     depends_on:
       db:
         condition: service_healthy
+      hsm-service:
+        condition: service_started
     networks:
       - backend
 
@@ -46,6 +49,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://xcardia:xcardia@db:5432/xcardia
+      - JWT_SECRET_KEY=your-secret-key-here-change-in-production
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +60,10 @@ services:
     build: ./hsm-service
     ports:
       - "8002:8000"
+    environment:
+      - HSM_AES_KEY=your-hsm-aes-key-here-change-in-production
+      - JWT_SECRET_KEY=your-secret-key-here-change-in-production
+      - DISABLE_AUTH=true
     networks:
       - backend
 
@@ -65,12 +73,17 @@ services:
       - "8001:8000"
     environment:
       - DATABASE_URL=postgresql://xcardia:xcardia@db:5432/xcardia
+      - JWT_SECRET_KEY=your-secret-key-here-change-in-production
     volumes:
       - ./pdf2jpg-service/temp:/app/temp
       - ./pdf2jpg-service/output_images:/app/output_images
     depends_on:
       db:
         condition: service_healthy
+      hsm-service:
+        condition: service_started
+      ai-service:
+        condition: service_started
     networks:
       - backend
 

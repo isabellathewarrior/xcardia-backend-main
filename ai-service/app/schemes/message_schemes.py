@@ -1,13 +1,13 @@
-from pydantic import BaseModel, AwareDatetime
-from typing import Union
-
+from pydantic import BaseModel, Field, AwareDatetime
+from typing import List, Optional, Union
 from enum import Enum
+from datetime import datetime
 
 
 class RoleEnum(str, Enum):
-    system = "system"
     user = "user"
     assistant = "assistant"
+    system = "system"
 
 
 class MessageToSend(BaseModel):
@@ -17,20 +17,16 @@ class MessageToSend(BaseModel):
     chat_id: str = 'test_chat'
 
     def to_llm_message(self) -> dict:
-        """
-        Convert the message to a format suitable for LLM processing.
-        - **Returns**: A dictionary representing the message.
-        """
         return {
             "role": self.role.value,
-            "content": self.content,
+            "content": self.content
         }
 
 
 class MessageSent(MessageToSend):
-    id: str
-    created_at: AwareDatetime
-    updated_at: Union[AwareDatetime, None] = None
+    id: int
+    created_at: datetime
+    updated_at: Union[datetime, None] = None
 
 
 class ChatToLoad(BaseModel):
@@ -40,53 +36,26 @@ class ChatToLoad(BaseModel):
 
 
 class ChatToSend(ChatToLoad):
-    messages: list[MessageToSend]
+    messages: List[MessageToSend]
 
     def append(self, message: MessageToSend) -> None:
-        """
-        Append a new message to the chat.
-        - **message**: The message to be appended.
-        """
         self.messages.append(message)
 
-    def extend(self, messages: list[MessageToSend]) -> None:
-        """
-        Extend the chat with a list of messages.
-        - **messages**: A list of messages to be appended.
-        """
-        self.messages.extend(messages)
-
-    def to_llm_messages(self) -> list[dict]:
-        """
-        Convert the chat messages to a format suitable for LLM processing.
-        - **Returns**: A list of dictionaries representing the messages.
-        """
-        return [
-            {
-                "role": message.role,
-                "content": message.content,
-            }
-            for message in self.messages
-        ]
+    def to_llm_chat(self) -> List[dict]:
+        return [message.to_llm_message() for message in self.messages]
 
     @classmethod
-    def from_first_user_message(
-        cls, 
-        first_message_from_user: MessageToSend,
-        messages: list[dict] = [], 
-        ) -> "ChatToSend":
-        """
-        Create a ChatToSend object from LLM messages.
-        - **messages**: A list of dictionaries representing the messages.
-        - **user_id**: The ID of the user.
-        - **Returns**: A ChatToSend object.
-        """
-        chat = cls(
-            id=first_message_from_user.chat_id,
-            user_id=first_message_from_user.user_id,
-            messages=[MessageToSend(**message) for message in messages],
-        )
+    def from_list_of_dicts(cls, messages: List[dict], id: str, user_id: str) -> "ChatToSend":
+        chat = cls(id=id, user_id=user_id, messages=[])
+        for message in messages:
+            chat.append(MessageToSend(
+                content=message["content"],
+                role=RoleEnum(message["role"]),
+                user_id=user_id,
+                chat_id=id
+            ))
         return chat
+
 
 class ChatLoaded(ChatToSend):
     pass 

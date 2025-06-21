@@ -1,17 +1,16 @@
-from sqlalchemy import Column, DateTime, Integer, String, func
-
+from sqlalchemy import Column, Integer, String, Text, DateTime, func
 from app.db.base import Base
 
 
 class MessageModel(Base):
     __tablename__ = "messages"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=False)
     chat_id = Column(String, index=True, nullable=False)
-    role = Column(String, index=True, nullable=False)
-    content = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    role = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def to_dict(self) -> dict:
